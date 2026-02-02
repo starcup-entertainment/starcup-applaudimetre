@@ -1,0 +1,816 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Applaudimètre Duel — STARCUP</title>
+  <style>
+    :root{
+      --bgA:#05040c;
+      --bgB:#12022a;
+
+      --glass: rgba(255,255,255,.10);
+      --stroke: rgba(255,255,255,.18);
+
+      --text: rgba(255,255,255,.95);
+      --muted: rgba(255,255,255,.74);
+
+      --shadow: 0 24px 100px rgba(0,0,0,.60);
+
+      /* 80's neon palette */
+      --neonBlue: #00d5ff;
+      --neonViolet:#7c3cff;
+      --neonPink:#ff2bd6;
+      --neonHot:#ff4d6d;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); }
+    body{
+      overflow:hidden;
+      background:
+        radial-gradient(900px 600px at 20% 25%, rgba(0,213,255,.22), transparent 60%),
+        radial-gradient(900px 600px at 80% 25%, rgba(255,43,214,.20), transparent 60%),
+        radial-gradient(900px 650px at 50% 90%, rgba(124,60,255,.20), transparent 60%),
+        linear-gradient(160deg, var(--bgA), var(--bgB));
+    }
+
+    /* subtle animated light sweeps */
+    .spot{
+      position:absolute; inset:-45vmax;
+      background: conic-gradient(from 0deg, rgba(255,255,255,0), rgba(255,255,255,.08), rgba(255,255,255,0));
+      filter: blur(55px);
+      animation: spin 20s linear infinite;
+      opacity:.45;
+      pointer-events:none;
+    }
+    .spot.two{ animation-duration: 32s; opacity:.30; transform: scale(1.10); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .wrap{
+      position:relative;
+      height:100%;
+      display:grid;
+      grid-template-rows: auto 1fr auto;
+      padding: 22px;
+      gap: 14px;
+      z-index: 1;
+    }
+
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    }
+    .brand{
+      display:flex; gap:12px; align-items:baseline; flex-wrap:wrap;
+    }
+    .title{
+      font-size: clamp(22px, 2.8vw, 36px);
+      font-weight: 1000;
+      letter-spacing:.02em;
+      text-shadow: 0 0 22px rgba(0,213,255,.18);
+    }
+    .badge{
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.16);
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .controls{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    }
+    button{
+      appearance:none;
+      border:1px solid rgba(255,255,255,.20);
+      background: rgba(255,255,255,.10);
+      color: var(--text);
+      padding: 11px 14px;
+      border-radius: 14px;
+      font-weight: 900;
+      font-size: 15px;
+      cursor:pointer;
+      box-shadow: 0 10px 28px rgba(0,0,0,.30);
+      transition: transform .08s ease, filter .12s ease, background .2s ease;
+    }
+    button:hover{ filter: brightness(1.12); }
+    button:active{ transform: scale(.98); }
+    button:disabled{ opacity:.5; cursor:not-allowed; }
+
+    .main{ display:grid; place-items:center; }
+    .card{
+      width: min(1350px, 96vw);
+      padding: clamp(16px, 2.0vw, 26px);
+      border-radius: 26px;
+      background: linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.06));
+      border: 1px solid rgba(255,255,255,.16);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+    }
+    @media (max-width: 900px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .team{
+      padding: 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.14);
+    }
+
+    .teamHeader{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap:wrap;
+    }
+    .teamName{
+      font-size: clamp(20px, 2.2vw, 30px);
+      font-weight: 1000;
+      letter-spacing: .01em;
+    }
+    .teamTag{
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+      color: var(--muted);
+      font-weight: 850;
+      font-size: 13px;
+    }
+
+    /* NEON meter */
+    .meter{
+      height: 115px;
+      border-radius: 22px;
+      background: rgba(0,0,0,.22);
+      border: 1px solid rgba(255,255,255,.14);
+      overflow:hidden;
+      position:relative;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+    }
+    .meter::before{
+      content:"";
+      position:absolute; inset:0;
+      background: linear-gradient(90deg,
+        rgba(0,213,255,1) 0%,
+        rgba(124,60,255,1) 55%,
+        rgba(255,43,214,1) 100%);
+      opacity:.16;
+    }
+    .fill{
+      position:absolute; inset:0 auto 0 0;
+      width:0%;
+      background: linear-gradient(90deg,
+        rgba(0,213,255,1) 0%,
+        rgba(124,60,255,1) 55%,
+        rgba(255,43,214,1) 100%);
+      filter:
+        drop-shadow(0 0 24px rgba(0,213,255,.18))
+        drop-shadow(0 0 24px rgba(255,43,214,.14));
+      transition: width 40ms linear;
+    }
+    .scanline{
+      position:absolute; inset:0;
+      background: repeating-linear-gradient(
+        180deg,
+        rgba(255,255,255,.06) 0px,
+        rgba(255,255,255,.06) 1px,
+        rgba(255,255,255,0) 3px,
+        rgba(255,255,255,0) 7px
+      );
+      opacity:.10;
+      pointer-events:none;
+    }
+    .shine{
+      position:absolute; top:-45%; left:-30%;
+      width: 38%; height: 190%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.26), transparent);
+      transform: skewX(-18deg);
+      opacity:.55;
+      animation: sweep 2.6s ease-in-out infinite;
+      pointer-events:none;
+    }
+    @keyframes sweep{
+      0%{ left:-38%; opacity:.0; }
+      18%{ opacity:.60; }
+      62%{ opacity:.60; }
+      100%{ left:115%; opacity:.0; }
+    }
+
+    .bigScore{
+      margin-top: 12px;
+      font-size: clamp(52px, 6.8vw, 98px);
+      font-weight: 1050;
+      line-height: 1;
+      letter-spacing: .01em;
+      text-shadow: 0 0 26px rgba(255,43,214,.18);
+    }
+
+    .miniRow{
+      margin-top: 10px;
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 13px;
+    }
+    .pill{
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.14);
+    }
+
+    .winner{
+      margin-top: 16px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(255,255,255,.10);
+      border: 1px solid rgba(255,255,255,.16);
+      display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;
+    }
+    .winner strong{ font-size: clamp(18px, 2vw, 22px); }
+    .winner span{ color: var(--muted); font-weight: 850; }
+
+    /* Sensitivity slider */
+    .sliderWrap{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    input[type="range"]{
+      width: 240px;
+      accent-color: var(--neonPink);
+    }
+
+    /* Overlay: NO BLUR, BIG & visible, shows LIVE bar + score */
+    .overlay{
+      position:absolute; inset:0;
+      display:none;
+      place-items:center;
+      background: radial-gradient(900px 550px at 50% 50%, rgba(0,0,0,.55), rgba(0,0,0,.35));
+      z-index: 10;
+    }
+    .overlay.show{ display:grid; }
+
+    .overlayBox{
+      width: min(1200px, 92vw);
+      padding: clamp(18px, 3vw, 34px);
+      border-radius: 28px;
+      background: rgba(0,0,0,.35);
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: 0 30px 110px rgba(0,0,0,.65);
+      text-align:center;
+    }
+    .overlayTitle{
+      font-weight: 1000;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      font-size: clamp(18px, 2.1vw, 28px);
+      color: rgba(255,255,255,.90);
+    }
+    .overlayTeam{
+      margin-top: 10px;
+      font-weight: 1050;
+      font-size: clamp(22px, 2.6vw, 34px);
+      color: rgba(255,255,255,.92);
+      text-shadow: 0 0 24px rgba(0,213,255,.18);
+    }
+    .overlayBig{
+      margin-top: 10px;
+      font-weight: 1100;
+      font-size: min(18vw, 200px);
+      line-height: 1;
+      letter-spacing: .02em;
+      text-shadow:
+        0 0 30px rgba(0,213,255,.20),
+        0 0 30px rgba(255,43,214,.18);
+    }
+    .overlaySub{
+      margin-top: 8px;
+      font-size: clamp(16px, 2.0vw, 24px);
+      color: rgba(255,255,255,.78);
+      font-weight: 900;
+    }
+    .overlayMeter{
+      margin-top: 18px;
+      height: 110px;
+      border-radius: 22px;
+      background: rgba(0,0,0,.26);
+      border: 1px solid rgba(255,255,255,.18);
+      overflow:hidden;
+      position:relative;
+    }
+    .overlayFill{
+      position:absolute; inset:0 auto 0 0;
+      width:0%;
+      background: linear-gradient(90deg,
+        rgba(0,213,255,1) 0%,
+        rgba(124,60,255,1) 55%,
+        rgba(255,43,214,1) 100%);
+      filter:
+        drop-shadow(0 0 28px rgba(0,213,255,.22))
+        drop-shadow(0 0 28px rgba(255,43,214,.20));
+      transition: width 30ms linear;
+    }
+    .overlayGrid{
+      position:absolute; inset:0;
+      background: linear-gradient(90deg,
+        rgba(255,255,255,.10) 1px, transparent 1px);
+      background-size: 10% 100%;
+      opacity:.12;
+      pointer-events:none;
+    }
+
+    canvas#confetti{
+      position:absolute; inset:0;
+      pointer-events:none;
+      z-index: 9;
+    }
+
+    .footer{
+      display:flex; justify-content:space-between; align-items:center;
+      gap: 10px; flex-wrap:wrap;
+      color: var(--muted);
+      font-size: 13px;
+      opacity:.92;
+    }
+  </style>
+</head>
+<body>
+  <div class="spot"></div>
+  <div class="spot two"></div>
+  <canvas id="confetti"></canvas>
+
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="title">Applaudimètre — Duel - STARCUP.IO</div>
+        <div class="badge">Compte à rebours · Mesure 5s · Score final</div>
+      </div>
+
+      <div class="controls">
+        <button id="btnA">Lancer Équipe A</button>
+        <button id="btnB">Lancer Équipe B</button>
+        <button id="calibBtn">Calibrer (2s calme)</button>
+        <div class="sliderWrap">
+          <span class="badge">Sensibilité</span>
+          <input id="sens" type="range" min="80" max="600" value="260" />
+          <span class="badge">Max: <span id="maxv">260</span></span>
+        </div>
+        <button id="fullscreenBtn">Plein écran</button>
+        <button id="stopBtn" disabled>Stop micro</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <div class="card">
+        <div class="grid">
+          <div class="team">
+            <div class="teamHeader">
+              <div class="teamName">Équipe A</div>
+              <div class="teamTag">Score A: <span id="scoreAmini">0</span></div>
+            </div>
+            <div class="meter">
+              <div class="fill" id="fillA"></div>
+              <div class="shine"></div>
+              <div class="scanline"></div>
+            </div>
+            <div class="bigScore"><span id="scoreA">0</span></div>
+            <div class="miniRow">
+              <span class="pill">Pic: <span id="peakA">0</span></span>
+              <span class="pill">Moy.: <span id="avgA">0</span></span>
+            </div>
+          </div>
+
+          <div class="team">
+            <div class="teamHeader">
+              <div class="teamName">Équipe B</div>
+              <div class="teamTag">Score B: <span id="scoreBmini">0</span></div>
+            </div>
+            <div class="meter">
+              <div class="fill" id="fillB"></div>
+              <div class="shine"></div>
+              <div class="scanline"></div>
+            </div>
+            <div class="bigScore"><span id="scoreB">0</span></div>
+            <div class="miniRow">
+              <span class="pill">Pic: <span id="peakB">0</span></span>
+              <span class="pill">Moy.: <span id="avgB">0</span></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="winner" style="margin-top:16px;">
+          <div>
+            <strong>Résultat :</strong>
+            <span id="resultText">Prêt — lance A puis B.</span>
+          </div>
+          <div>
+            <span class="pill">Bruit (calme): <span id="noise">0</span></span>
+            <span class="pill">État: <span id="state">Prêt</span></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="overlay" id="overlay">
+        <div class="overlayBox">
+          <div class="overlayTitle" id="ovTitle">Préparez-vous</div>
+          <div class="overlayTeam" id="ovTeam">Équipe A</div>
+          <div class="overlayBig" id="ovBig">3</div>
+          <div class="overlaySub" id="ovSub">…</div>
+
+          <div class="overlayMeter" aria-label="Jauge live">
+            <div class="overlayFill" id="ovFill"></div>
+            <div class="overlayGrid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>Conseil : micro loin des enceintes. Calibrer quand la salle est “stable”. Ajuste Sensibilité si 100 arrive trop vite.</div>
+      <div>Web Audio API · Micro navigateur</div>
+    </div>
+  </div>
+
+<script>
+/* ========= CONFIG ========= */
+const COUNTDOWN_SECONDS = 3;
+const MEASURE_SECONDS = 5.0; // ✅ demandé: 5 secondes
+
+/* ========= DOM ========= */
+const btnA = document.getElementById('btnA');
+const btnB = document.getElementById('btnB');
+const calibBtn = document.getElementById('calibBtn');
+const fullscreenBtn = document.getElementById('fullscreenBtn');
+const stopBtn = document.getElementById('stopBtn');
+
+const fillA = document.getElementById('fillA');
+const fillB = document.getElementById('fillB');
+
+const scoreAEl = document.getElementById('scoreA');
+const scoreBEl = document.getElementById('scoreB');
+const scoreAmini = document.getElementById('scoreAmini');
+const scoreBmini = document.getElementById('scoreBmini');
+
+const peakAEl = document.getElementById('peakA');
+const avgAEl = document.getElementById('avgA');
+const peakBEl = document.getElementById('peakB');
+const avgBEl = document.getElementById('avgB');
+
+const resultText = document.getElementById('resultText');
+const noiseEl = document.getElementById('noise');
+const stateEl = document.getElementById('state');
+
+const sens = document.getElementById('sens');
+const maxvEl = document.getElementById('maxv');
+
+/* Overlay */
+const overlay = document.getElementById('overlay');
+const ovTitle = document.getElementById('ovTitle');
+const ovTeam  = document.getElementById('ovTeam');
+const ovBig   = document.getElementById('ovBig');
+const ovSub   = document.getElementById('ovSub');
+const ovFill  = document.getElementById('ovFill');
+
+let maxLevel = Number(sens.value);
+maxvEl.textContent = maxLevel;
+sens.addEventListener('input', () => {
+  maxLevel = Number(sens.value);
+  maxvEl.textContent = maxLevel;
+});
+
+/* ========= AUDIO ========= */
+let audioCtx, analyser, data, src, stream;
+let running = false;
+let noiseFloor = 0;
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+function rmsFromTimeDomain(byteArray) {
+  let sum = 0;
+  for (let i = 0; i < byteArray.length; i++) {
+    const v = (byteArray[i] - 128) / 128;
+    sum += v * v;
+  }
+  return Math.sqrt(sum / byteArray.length);
+}
+function clamp01(x){ return Math.max(0, Math.min(1, x)); }
+
+async function startAudio() {
+  stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  data = new Uint8Array(analyser.fftSize);
+  src = audioCtx.createMediaStreamSource(stream);
+  src.connect(analyser);
+
+  running = true;
+  calibBtn.disabled = false;
+  stopBtn.disabled = false;
+  stateEl.textContent = "Micro OK";
+}
+
+function stopAudio() {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  if (audioCtx) audioCtx.close();
+  audioCtx = null;
+  running = false;
+  calibBtn.disabled = true;
+  stopBtn.disabled = true;
+  stateEl.textContent = "Arrêté";
+}
+
+function levelNow() {
+  analyser.getByteTimeDomainData(data);
+  const rms = rmsFromTimeDomain(data);
+  return Math.round(rms * 1000);
+}
+
+/* ========= UI helpers ========= */
+function setBar(el, pct){
+  pct = Math.max(0, Math.min(100, pct));
+  el.style.width = pct + "%";
+}
+function showOverlay(){ overlay.classList.add('show'); }
+function hideOverlay(){ overlay.classList.remove('show'); }
+
+/* ========= CALIB ========= */
+async function calibrate2s() {
+  if (!running) return;
+  stateEl.textContent = "Calibration…";
+  ovTitle.textContent = "Calibration";
+  ovTeam.textContent = "Silence 2 secondes";
+  ovBig.textContent = "…";
+  ovSub.textContent = "On mesure le bruit ambiant";
+  setBar(ovFill, 0);
+  showOverlay();
+
+  let t0 = performance.now();
+  let acc = 0, n = 0;
+  while (performance.now() - t0 < 2000) {
+    acc += levelNow();
+    n++;
+    await sleep(30);
+  }
+  noiseFloor = Math.round(acc / Math.max(1, n));
+  noiseEl.textContent = noiseFloor;
+
+  ovBig.textContent = "OK";
+  ovSub.textContent = `Bruit mesuré: ${noiseFloor}`;
+  await sleep(650);
+  hideOverlay();
+
+  stateEl.textContent = "Calibré";
+}
+
+/* ========= COUNTDOWN + MEASURE ========= */
+async function countdown(teamLabel){
+  showOverlay();
+  ovTitle.textContent = "Préparez-vous";
+  ovTeam.textContent = teamLabel;
+  ovSub.textContent = "On démarre dans…";
+  setBar(ovFill, 0);
+
+  for (let n = COUNTDOWN_SECONDS; n >= 1; n--) {
+    ovBig.textContent = String(n);
+    await sleep(800);
+  }
+  ovBig.textContent = "GO!";
+  ovTitle.textContent = "FAITES DU BRUIT !";
+  ovSub.textContent = `Mesure pendant ${MEASURE_SECONDS.toFixed(0)} secondes`;
+  await sleep(420);
+}
+
+async function measure(team, fillEl){
+  let t0 = performance.now();
+
+  let accEff = 0;
+  let peakEff = 0;
+  let samples = 0;
+
+  // pour un rendu live motivant : gros score + barre live
+  let smooth = 0;
+  let secondsLeft = MEASURE_SECONDS;
+
+  while ((performance.now() - t0) < MEASURE_SECONDS * 1000) {
+    const raw = levelNow();
+    const eff = Math.max(0, raw - noiseFloor);
+    accEff += eff;
+    peakEff = Math.max(peakEff, eff);
+    samples++;
+
+    const t = clamp01(eff / maxLevel);
+    smooth = smooth * 0.80 + t * 0.20;
+
+    const livePct = Math.round(smooth * 100);
+    setBar(fillEl, livePct);
+    setBar(ovFill, livePct);
+
+    // “timer” visuel pendant la mesure
+    const elapsed = (performance.now() - t0) / 1000;
+    secondsLeft = Math.max(0, MEASURE_SECONDS - elapsed);
+    ovBig.textContent = String(livePct);
+    ovSub.textContent = `Explosez la jauge ! ${secondsLeft.toFixed(1)}s`;
+
+    await sleep(20);
+  }
+
+  const avgEff = accEff / Math.max(1, samples);
+  const combined = (avgEff * 0.75) + (peakEff * 0.25);
+  const score = Math.round(clamp01(combined / maxLevel) * 100);
+
+  setBar(fillEl, score);
+  setBar(ovFill, score);
+  ovBig.textContent = String(score);
+  ovSub.textContent = "Score final";
+
+  return { score, avgEff: Math.round(avgEff), peakEff: Math.round(peakEff) };
+}
+
+/* ========= DUEL STATE ========= */
+let scoreA = 0, scoreB = 0;
+
+function updateResult(){
+  if (scoreA === 0 && scoreB === 0) {
+    resultText.textContent = "Prêt — lance A puis B.";
+    return;
+  }
+  if (scoreA !== 0 && scoreB === 0) {
+    resultText.textContent = "Équipe A enregistrée. Lance Équipe B !";
+    return;
+  }
+  if (scoreA === 0 && scoreB !== 0) {
+    resultText.textContent = "Équipe B enregistrée. Lance Équipe A !";
+    return;
+  }
+
+  if (scoreA > scoreB) {
+    resultText.textContent = `🏆 Victoire Équipe A (${scoreA} vs ${scoreB}) !`;
+    burstConfetti();
+  } else if (scoreB > scoreA) {
+    resultText.textContent = `🏆 Victoire Équipe B (${scoreB} vs ${scoreA}) !`;
+    burstConfetti();
+  } else {
+    resultText.textContent = `🤝 Égalité parfaite (${scoreA} vs ${scoreB}) !`;
+    burstConfetti();
+  }
+}
+
+/* ========= CONFETTI ========= */
+const confettiCanvas = document.getElementById('confetti');
+const ctx = confettiCanvas.getContext('2d');
+let confetti = [];
+function resizeCanvas(){
+  confettiCanvas.width = window.innerWidth * devicePixelRatio;
+  confettiCanvas.height = window.innerHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0);
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+let confettiAnim = null;
+function burstConfetti(){
+  const W = window.innerWidth, H = window.innerHeight;
+  confetti = [];
+  const n = 220;
+
+  const palette = [
+    {h: 190, s: 95, l: 60}, // neon blue
+    {h: 260, s: 95, l: 65}, // violet
+    {h: 315, s: 95, l: 62}, // pink
+    {h: 340, s: 95, l: 60}  // hot pink/red
+  ];
+
+  for (let i=0;i<n;i++){
+    const c = palette[Math.floor(Math.random()*palette.length)];
+    confetti.push({
+      x: W/2 + (Math.random()-0.5)*180,
+      y: H*0.28 + (Math.random()-0.5)*80,
+      vx: (Math.random()-0.5)*12,
+      vy: - (Math.random()*10 + 6),
+      g: 0.25 + Math.random()*0.20,
+      r: 2 + Math.random()*5,
+      a: 1,
+      rot: Math.random()*Math.PI,
+      vr: (Math.random()-0.5)*0.30,
+      color: `hsl(${c.h} ${c.s}% ${c.l}%)`
+    });
+  }
+  animateConfetti();
+}
+function animateConfetti(){
+  if (confettiAnim) cancelAnimationFrame(confettiAnim);
+  const W = window.innerWidth, H = window.innerHeight;
+
+  function step(){
+    ctx.clearRect(0,0,W,H);
+    let alive = 0;
+
+    for (const p of confetti){
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += p.g;
+      p.rot += p.vr;
+      p.a -= 0.006;
+
+      if (p.a > 0 && p.y < H + 60){
+        alive++;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.a);
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.r, -p.r, p.r*2.6, p.r*1.2);
+        ctx.restore();
+      }
+    }
+    if (alive > 0) confettiAnim = requestAnimationFrame(step);
+    else { ctx.clearRect(0,0,W,H); confettiAnim = null; }
+  }
+  step();
+}
+
+/* ========= BUTTONS ========= */
+fullscreenBtn.addEventListener('click', () => {
+  const el = document.documentElement;
+  if (el.requestFullscreen) el.requestFullscreen();
+});
+
+stopBtn.addEventListener('click', () => stopAudio());
+calibBtn.addEventListener('click', async () => {
+  try {
+    if (!running) await startAudio();   // démarre le micro si besoin
+    await calibrate2s();
+  } catch (err) {
+    alert("Micro refusé ou indisponible : " + err);
+    hideOverlay();
+    stopAudio();
+  }
+});
+
+async function runTeam(team){
+  try{
+    if (!running) await startAudio();
+
+    btnA.disabled = true;
+    btnB.disabled = true;
+    stateEl.textContent = `Mesure ${team}…`;
+
+    const teamLabel = (team === 'A') ? "Équipe A" : "Équipe B";
+    await countdown(teamLabel);
+
+    const res = await measure(team, team === 'A' ? fillA : fillB);
+
+    // stats
+    if (team === 'A'){
+      scoreA = res.score;
+      scoreAEl.textContent = scoreA;
+      scoreAmini.textContent = scoreA;
+      avgAEl.textContent = res.avgEff;
+      peakAEl.textContent = res.peakEff;
+    } else {
+      scoreB = res.score;
+      scoreBEl.textContent = scoreB;
+      scoreBmini.textContent = scoreB;
+      avgBEl.textContent = res.avgEff;
+      peakBEl.textContent = res.peakEff;
+    }
+
+    stateEl.textContent = "Terminé";
+    ovTitle.textContent = "Score final";
+    ovTeam.textContent = teamLabel;
+    ovSub.textContent = "Bravo !";
+    await sleep(900);
+    hideOverlay();
+
+    updateResult();
+
+  } catch(err){
+    alert("Micro refusé ou indisponible : " + err);
+    stateEl.textContent = "Erreur micro";
+    hideOverlay();
+    stopAudio();
+  } finally {
+    btnA.disabled = false;
+    btnB.disabled = false;
+  }
+}
+
+btnA.addEventListener('click', () => runTeam('A'));
+btnB.addEventListener('click', () => runTeam('B'));
+</script>
+</body>
+</html>
