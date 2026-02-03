@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Starcup Applaudimetre</title>
+  <title>Starcup Applaudimètre</title>
   <style>
     :root{
       --bgA:#05040c;
@@ -17,7 +17,6 @@
 
       --shadow: 0 24px 100px rgba(0,0,0,.60);
 
-      /* 80's neon palette */
       --neonBlue: #00d5ff;
       --neonViolet:#7c3cff;
       --neonPink:#ff2bd6;
@@ -35,7 +34,6 @@
         linear-gradient(160deg, var(--bgA), var(--bgB));
     }
 
-    /* subtle animated light sweeps */
     .spot{
       position:absolute; inset:-45vmax;
       background: conic-gradient(from 0deg, rgba(255,255,255,0), rgba(255,255,255,.08), rgba(255,255,255,0));
@@ -77,6 +75,7 @@
       color: var(--muted);
       font-weight: 800;
       font-size: 13px;
+      white-space: nowrap;
     }
 
     .controls{
@@ -99,7 +98,15 @@
     button:active{ transform: scale(.98); }
     button:disabled{ opacity:.5; cursor:not-allowed; }
 
-    .main{ display:grid; place-items:center; }
+    .sliderWrap{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    input[type="range"]{
+      width: 240px;
+      accent-color: var(--neonPink);
+    }
+
+    .main{ display:grid; place-items:center; overflow:auto; }
     .card{
       width: min(1350px, 96vw);
       padding: clamp(16px, 2.0vw, 26px);
@@ -110,14 +117,15 @@
       backdrop-filter: blur(10px);
     }
 
-    .grid{
+    .teamsGrid{
       display:grid;
       grid-template-columns: 1fr 1fr;
       gap: 16px;
       align-items: stretch;
     }
-    @media (max-width: 900px){
-      .grid{ grid-template-columns: 1fr; }
+    @media (max-width: 980px){
+      .teamsGrid{ grid-template-columns: 1fr; }
+      input[type="range"]{ width: 200px; }
     }
 
     .team{
@@ -126,7 +134,6 @@
       border: 1px solid rgba(255,255,255,.14);
       background: rgba(0,0,0,.14);
     }
-
     .teamHeader{
       display:flex;
       justify-content:space-between;
@@ -136,7 +143,7 @@
       flex-wrap:wrap;
     }
     .teamName{
-      font-size: clamp(20px, 2.2vw, 30px);
+      font-size: clamp(18px, 2.2vw, 28px);
       font-weight: 1000;
       letter-spacing: .01em;
     }
@@ -148,9 +155,29 @@
       color: var(--muted);
       font-weight: 850;
       font-size: 13px;
+      white-space: nowrap;
     }
 
-    /* NEON meter */
+    .nameRow{
+      margin-top: 10px;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .nameInput{
+      flex:1;
+      min-width: 220px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.18);
+      color: rgba(255,255,255,.95);
+      font-weight: 800;
+      outline: none;
+    }
+    .nameInput::placeholder{ color: rgba(255,255,255,.55); }
+
     .meter{
       height: 115px;
       border-radius: 22px;
@@ -230,6 +257,16 @@
       border-radius: 999px;
       background: rgba(255,255,255,.08);
       border: 1px solid rgba(255,255,255,.14);
+      white-space: nowrap;
+    }
+
+    .bottomRow{
+      margin-top: 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     .winner{
@@ -243,22 +280,14 @@
     .winner strong{ font-size: clamp(18px, 2vw, 22px); }
     .winner span{ color: var(--muted); font-weight: 850; }
 
-    /* Sensitivity slider */
-    .sliderWrap{
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-    }
-    input[type="range"]{
-      width: 240px;
-      accent-color: var(--neonPink);
-    }
-
-    /* Overlay: NO BLUR, BIG & visible, shows LIVE bar + score */
+    /* Overlay: plus opaque (tu demandais) */
     .overlay{
       position:absolute; inset:0;
       display:none;
       place-items:center;
-      background: radial-gradient(900px 550px at 50% 50%, rgba(0,0,0,.55), rgba(0,0,0,.35));
+      background: rgba(0,0,0,.90); /* ← opacité forte */
       z-index: 10;
+      padding: 18px;
     }
     .overlay.show{ display:grid; }
 
@@ -344,6 +373,12 @@
       font-size: 13px;
       opacity:.92;
     }
+
+    .hint{
+      color: rgba(255,255,255,.78);
+      font-weight: 850;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
@@ -354,19 +389,20 @@
   <div class="wrap">
     <div class="topbar">
       <div class="brand">
-        <div class="title">Starcup Applaudimetre</div>
+        <div class="title">Starcup Applaudimètre</div>
         <div class="badge">Compte à rebours · Mesure 5s · Score final</div>
       </div>
 
       <div class="controls">
-        <button id="btnA">Lancer Équipe A</button>
-        <button id="btnB">Lancer Équipe B</button>
         <button id="calibBtn">Calibrer (2s calme)</button>
+
         <div class="sliderWrap">
           <span class="badge">Sensibilité</span>
-          <input id="sens" type="range" min="80" max="600" value="260" />
-          <span class="badge">Max: <span id="maxv">260</span></span>
+          <input id="sens" type="range" min="80" max="900" value="320" />
+          <span class="badge">Max: <span id="maxv">320</span></span>
         </div>
+
+        <button id="addTeamBtn">+ Ajouter une équipe</button>
         <button id="fullscreenBtn">Plein écran</button>
         <button id="stopBtn" disabled>Stop micro</button>
       </div>
@@ -374,46 +410,17 @@
 
     <div class="main">
       <div class="card">
-        <div class="grid">
-          <div class="team">
-            <div class="teamHeader">
-              <div class="teamName">Équipe A</div>
-              <div class="teamTag">Score A: <span id="scoreAmini">0</span></div>
-            </div>
-            <div class="meter">
-              <div class="fill" id="fillA"></div>
-              <div class="shine"></div>
-              <div class="scanline"></div>
-            </div>
-            <div class="bigScore"><span id="scoreA">0</span></div>
-            <div class="miniRow">
-              <span class="pill">Pic: <span id="peakA">0</span></span>
-              <span class="pill">Moy.: <span id="avgA">0</span></span>
-            </div>
-          </div>
+        <div class="teamsGrid" id="teamsGrid"></div>
 
-          <div class="team">
-            <div class="teamHeader">
-              <div class="teamName">Équipe B</div>
-              <div class="teamTag">Score B: <span id="scoreBmini">0</span></div>
-            </div>
-            <div class="meter">
-              <div class="fill" id="fillB"></div>
-              <div class="shine"></div>
-              <div class="scanline"></div>
-            </div>
-            <div class="bigScore"><span id="scoreB">0</span></div>
-            <div class="miniRow">
-              <span class="pill">Pic: <span id="peakB">0</span></span>
-              <span class="pill">Moy.: <span id="avgB">0</span></span>
-            </div>
-          </div>
+        <div class="bottomRow">
+          <div class="hint">Renomme les équipes si besoin, puis lance-les une par une (bouton “Lancer”).</div>
+          <div class="hint">Conseil : micro loin des enceintes. Calibrer quand la salle est stable.</div>
         </div>
 
         <div class="winner" style="margin-top:16px;">
           <div>
             <strong>Résultat :</strong>
-            <span id="resultText">Prêt — lance A puis B.</span>
+            <span id="resultText">Prêt — lance une équipe.</span>
           </div>
           <div>
             <span class="pill">Bruit (calme): <span id="noise">0</span></span>
@@ -425,7 +432,7 @@
       <div class="overlay" id="overlay">
         <div class="overlayBox">
           <div class="overlayTitle" id="ovTitle">Préparez-vous</div>
-          <div class="overlayTeam" id="ovTeam">Équipe A</div>
+          <div class="overlayTeam" id="ovTeam">Équipe</div>
           <div class="overlayBig" id="ovBig">3</div>
           <div class="overlaySub" id="ovSub">…</div>
 
@@ -438,44 +445,27 @@
     </div>
 
     <div class="footer">
-      <div>Conseil : micro loin des enceintes. Calibrer quand la salle est “stable”. Ajuste Sensibilité si 100 arrive trop vite.</div>
-      <div>Web Audio API · Micro navigateur</div>
+      <div>Web Audio API · Micro navigateur · Full front (GitHub Pages recommandé)</div>
+      <div>Astuce: si 100 arrive trop vite, augmente “Max”.</div>
     </div>
   </div>
 
 <script>
 /* ========= CONFIG ========= */
 const COUNTDOWN_SECONDS = 3;
-const MEASURE_SECONDS = 5.0; // ✅ demandé: 5 secondes
+const MEASURE_SECONDS = 5.0;
 
 /* ========= DOM ========= */
-const btnA = document.getElementById('btnA');
-const btnB = document.getElementById('btnB');
+const teamsGrid = document.getElementById('teamsGrid');
 const calibBtn = document.getElementById('calibBtn');
+const addTeamBtn = document.getElementById('addTeamBtn');
 const fullscreenBtn = document.getElementById('fullscreenBtn');
 const stopBtn = document.getElementById('stopBtn');
-
-const fillA = document.getElementById('fillA');
-const fillB = document.getElementById('fillB');
-
-const scoreAEl = document.getElementById('scoreA');
-const scoreBEl = document.getElementById('scoreB');
-const scoreAmini = document.getElementById('scoreAmini');
-const scoreBmini = document.getElementById('scoreBmini');
-
-const peakAEl = document.getElementById('peakA');
-const avgAEl = document.getElementById('avgA');
-const peakBEl = document.getElementById('peakB');
-const avgBEl = document.getElementById('avgB');
 
 const resultText = document.getElementById('resultText');
 const noiseEl = document.getElementById('noise');
 const stateEl = document.getElementById('state');
 
-const sens = document.getElementById('sens');
-const maxvEl = document.getElementById('maxv');
-
-/* Overlay */
 const overlay = document.getElementById('overlay');
 const ovTitle = document.getElementById('ovTitle');
 const ovTeam  = document.getElementById('ovTeam');
@@ -483,11 +473,13 @@ const ovBig   = document.getElementById('ovBig');
 const ovSub   = document.getElementById('ovSub');
 const ovFill  = document.getElementById('ovFill');
 
+const sens = document.getElementById('sens');
+const maxvEl = document.getElementById('maxv');
 let maxLevel = Number(sens.value);
-maxvEl.textContent = maxLevel;
+maxvEl.textContent = String(maxLevel);
 sens.addEventListener('input', () => {
   maxLevel = Number(sens.value);
-  maxvEl.textContent = maxLevel;
+  maxvEl.textContent = String(maxLevel);
 });
 
 /* ========= AUDIO ========= */
@@ -517,7 +509,6 @@ async function startAudio() {
   src.connect(analyser);
 
   running = true;
-  calibBtn.disabled = false;
   stopBtn.disabled = false;
   stateEl.textContent = "Micro OK";
 }
@@ -528,7 +519,6 @@ function stopAudio() {
   if (audioCtx) audioCtx.close();
   audioCtx = null;
   running = false;
-  calibBtn.disabled = true;
   stopBtn.disabled = true;
   stateEl.textContent = "Arrêté";
 }
@@ -547,9 +537,16 @@ function setBar(el, pct){
 function showOverlay(){ overlay.classList.add('show'); }
 function hideOverlay(){ overlay.classList.remove('show'); }
 
+function lockRunButtons(isLocked){
+  document.querySelectorAll('[data-run]').forEach(b => b.disabled = isLocked);
+  addTeamBtn.disabled = isLocked;
+  calibBtn.disabled = isLocked;
+}
+
 /* ========= CALIB ========= */
 async function calibrate2s() {
-  if (!running) return;
+  if (!running) await startAudio();
+
   stateEl.textContent = "Calibration…";
   ovTitle.textContent = "Calibration";
   ovTeam.textContent = "Silence 2 secondes";
@@ -566,7 +563,7 @@ async function calibrate2s() {
     await sleep(30);
   }
   noiseFloor = Math.round(acc / Math.max(1, n));
-  noiseEl.textContent = noiseFloor;
+  noiseEl.textContent = String(noiseFloor);
 
   ovBig.textContent = "OK";
   ovSub.textContent = `Bruit mesuré: ${noiseFloor}`;
@@ -594,20 +591,19 @@ async function countdown(teamLabel){
   await sleep(420);
 }
 
-async function measure(team, fillEl){
+async function measureLive(fillEl){
   let t0 = performance.now();
 
   let accEff = 0;
   let peakEff = 0;
   let samples = 0;
 
-  // pour un rendu live motivant : gros score + barre live
   let smooth = 0;
-  let secondsLeft = MEASURE_SECONDS;
 
   while ((performance.now() - t0) < MEASURE_SECONDS * 1000) {
     const raw = levelNow();
     const eff = Math.max(0, raw - noiseFloor);
+
     accEff += eff;
     peakEff = Math.max(peakEff, eff);
     samples++;
@@ -619,9 +615,8 @@ async function measure(team, fillEl){
     setBar(fillEl, livePct);
     setBar(ovFill, livePct);
 
-    // “timer” visuel pendant la mesure
     const elapsed = (performance.now() - t0) / 1000;
-    secondsLeft = Math.max(0, MEASURE_SECONDS - elapsed);
+    const secondsLeft = Math.max(0, MEASURE_SECONDS - elapsed);
     ovBig.textContent = String(livePct);
     ovSub.textContent = `Explosez la jauge ! ${secondsLeft.toFixed(1)}s`;
 
@@ -638,35 +633,6 @@ async function measure(team, fillEl){
   ovSub.textContent = "Score final";
 
   return { score, avgEff: Math.round(avgEff), peakEff: Math.round(peakEff) };
-}
-
-/* ========= DUEL STATE ========= */
-let scoreA = 0, scoreB = 0;
-
-function updateResult(){
-  if (scoreA === 0 && scoreB === 0) {
-    resultText.textContent = "Prêt — lance A puis B.";
-    return;
-  }
-  if (scoreA !== 0 && scoreB === 0) {
-    resultText.textContent = "Équipe A enregistrée. Lance Équipe B !";
-    return;
-  }
-  if (scoreA === 0 && scoreB !== 0) {
-    resultText.textContent = "Équipe B enregistrée. Lance Équipe A !";
-    return;
-  }
-
-  if (scoreA > scoreB) {
-    resultText.textContent = `🏆 Victoire Équipe A (${scoreA} vs ${scoreB}) !`;
-    burstConfetti();
-  } else if (scoreB > scoreA) {
-    resultText.textContent = `🏆 Victoire Équipe B (${scoreB} vs ${scoreA}) !`;
-    burstConfetti();
-  } else {
-    resultText.textContent = `🤝 Égalité parfaite (${scoreA} vs ${scoreB}) !`;
-    burstConfetti();
-  }
 }
 
 /* ========= CONFETTI ========= */
@@ -688,10 +654,10 @@ function burstConfetti(){
   const n = 220;
 
   const palette = [
-    {h: 190, s: 95, l: 60}, // neon blue
-    {h: 260, s: 95, l: 65}, // violet
-    {h: 315, s: 95, l: 62}, // pink
-    {h: 340, s: 95, l: 60}  // hot pink/red
+    {h: 190, s: 95, l: 60},
+    {h: 260, s: 95, l: 65},
+    {h: 315, s: 95, l: 62},
+    {h: 340, s: 95, l: 60}
   ];
 
   for (let i=0;i<n;i++){
@@ -743,16 +709,168 @@ function animateConfetti(){
   step();
 }
 
-/* ========= BUTTONS ========= */
+/* ========= TEAMS (2 par défaut + ajout illimité) ========= */
+let teamCounter = 0;
+const teams = []; // {id, name, score, avg, peak, els...}
+
+function makeTeamId(){
+  // T1, T2, T3... (sans limites, pas de soucis A/B/Z)
+  teamCounter += 1;
+  return `T${teamCounter}`;
+}
+
+function createTeamCard(team){
+  const el = document.createElement('div');
+  el.className = 'team';
+  el.innerHTML = `
+    <div class="teamHeader">
+      <div class="teamName" data-team-name="${team.id}">${escapeHtml(team.name)}</div>
+      <div class="teamTag">Score : <span id="mini-${team.id}">0</span></div>
+    </div>
+
+    <div class="meter">
+      <div class="fill" id="fill-${team.id}"></div>
+      <div class="shine"></div>
+      <div class="scanline"></div>
+    </div>
+
+    <div class="bigScore"><span id="score-${team.id}">0</span></div>
+
+    <div class="miniRow">
+      <span class="pill">Pic: <span id="peak-${team.id}">0</span></span>
+      <span class="pill">Moy.: <span id="avg-${team.id}">0</span></span>
+    </div>
+
+    <div class="nameRow">
+      <button data-run data-team="${team.id}">Lancer</button>
+      <input class="nameInput" data-name="${team.id}" type="text" value="${escapeAttr(team.name)}" />
+    </div>
+  `;
+
+  team.els = {
+    root: el,
+    nameLabel: el.querySelector(`[data-team-name="${team.id}"]`),
+    runBtn: el.querySelector(`[data-team="${team.id}"]`),
+    nameInput: el.querySelector(`[data-name="${team.id}"]`),
+    fill: el.querySelector(`#fill-${team.id}`),
+    score: el.querySelector(`#score-${team.id}`),
+    mini: el.querySelector(`#mini-${team.id}`),
+    peak: el.querySelector(`#peak-${team.id}`),
+    avg: el.querySelector(`#avg-${team.id}`)
+  };
+
+  // rename
+  team.els.nameInput.addEventListener('input', (e) => {
+    const v = (e.target.value || '').trim();
+    team.name = v.length ? v : 'Équipe';
+    team.els.nameLabel.textContent = team.name;
+  });
+
+  // run
+  team.els.runBtn.addEventListener('click', () => runTeam(team.id));
+
+  return el;
+}
+
+function addTeam(name){
+  const id = makeTeamId();
+  const team = { id, name: name || `Équipe ${teams.length + 1}`, score: 0, avg: 0, peak: 0, els: null };
+  teams.push(team);
+  teamsGrid.appendChild(createTeamCard(team));
+  updateResultText();
+}
+
+function updateResultText(){
+  const played = teams.filter(t => t.score > 0);
+  if (played.length === 0) {
+    resultText.textContent = "Prêt — lance une équipe.";
+    return;
+  }
+  if (played.length === 1) {
+    resultText.textContent = `${played[0].name} enregistrée. Lance une autre équipe !`;
+    return;
+  }
+
+  const sorted = [...played].sort((a,b) => b.score - a.score);
+  const best = sorted[0];
+  const second = sorted[1];
+
+  if (best.score === second.score) {
+    resultText.textContent = `🤝 Égalité en tête à ${best.score} !`;
+    burstConfetti();
+    return;
+  }
+
+  resultText.textContent = `🏆 Victoire ${best.name} (${best.score}) !`;
+  burstConfetti();
+}
+
+async function runTeam(teamId){
+  const team = teams.find(t => t.id === teamId);
+  if (!team) return;
+
+  try{
+    if (!running) await startAudio();
+
+    lockRunButtons(true);
+    stateEl.textContent = `Mesure ${team.name}…`;
+
+    await countdown(team.name);
+    const res = await measureLive(team.els.fill);
+
+    team.score = res.score;
+    team.avg = res.avgEff;
+    team.peak = res.peakEff;
+
+    team.els.score.textContent = String(team.score);
+    team.els.mini.textContent = String(team.score);
+    team.els.avg.textContent = String(team.avg);
+    team.els.peak.textContent = String(team.peak);
+
+    stateEl.textContent = "Terminé";
+    ovTitle.textContent = "Score final";
+    ovTeam.textContent = team.name;
+    ovSub.textContent = "Bravo !";
+    await sleep(900);
+    hideOverlay();
+
+    updateResultText();
+
+  } catch(err){
+    alert("Micro refusé ou indisponible : " + err);
+    stateEl.textContent = "Erreur micro";
+    hideOverlay();
+    stopAudio();
+  } finally {
+    lockRunButtons(false);
+  }
+}
+
+/* ========= utils ========= */
+function escapeHtml(s){
+  return String(s)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'","&#039;");
+}
+function escapeAttr(s){
+  return escapeHtml(s).replaceAll('\n',' ');
+}
+
+/* ========= buttons ========= */
+addTeamBtn.addEventListener('click', () => addTeam(`Équipe ${teams.length + 1}`));
+
 fullscreenBtn.addEventListener('click', () => {
   const el = document.documentElement;
   if (el.requestFullscreen) el.requestFullscreen();
 });
 
 stopBtn.addEventListener('click', () => stopAudio());
+
 calibBtn.addEventListener('click', async () => {
   try {
-    if (!running) await startAudio();   // démarre le micro si besoin
     await calibrate2s();
   } catch (err) {
     alert("Micro refusé ou indisponible : " + err);
@@ -761,58 +879,9 @@ calibBtn.addEventListener('click', async () => {
   }
 });
 
-async function runTeam(team){
-  try{
-    if (!running) await startAudio();
-
-    btnA.disabled = true;
-    btnB.disabled = true;
-    stateEl.textContent = `Mesure ${team}…`;
-
-    const teamLabel = (team === 'A') ? "Équipe A" : "Équipe B";
-    await countdown(teamLabel);
-
-    const res = await measure(team, team === 'A' ? fillA : fillB);
-
-    // stats
-    if (team === 'A'){
-      scoreA = res.score;
-      scoreAEl.textContent = scoreA;
-      scoreAmini.textContent = scoreA;
-      avgAEl.textContent = res.avgEff;
-      peakAEl.textContent = res.peakEff;
-    } else {
-      scoreB = res.score;
-      scoreBEl.textContent = scoreB;
-      scoreBmini.textContent = scoreB;
-      avgBEl.textContent = res.avgEff;
-      peakBEl.textContent = res.peakEff;
-    }
-
-    stateEl.textContent = "Terminé";
-    ovTitle.textContent = "Score final";
-    ovTeam.textContent = teamLabel;
-    ovSub.textContent = "Bravo !";
-    await sleep(900);
-    hideOverlay();
-
-    updateResult();
-
-  } catch(err){
-    alert("Micro refusé ou indisponible : " + err);
-    stateEl.textContent = "Erreur micro";
-    hideOverlay();
-    stopAudio();
-  } finally {
-    btnA.disabled = false;
-    btnB.disabled = false;
-  }
-}
-
-btnA.addEventListener('click', () => runTeam('A'));
-btnB.addEventListener('click', () => runTeam('B'));
+/* ========= init (2 équipes par défaut) ========= */
+addTeam("Équipe A");
+addTeam("Équipe B");
 </script>
 </body>
-
 </html>
-
